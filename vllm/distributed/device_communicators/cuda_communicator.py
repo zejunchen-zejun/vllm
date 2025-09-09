@@ -99,6 +99,56 @@ class CudaCommunicator(DeviceCommunicatorBase):
             else:
                 raise ValueError(f"Unknown all2all backend: {all2all_backend}")
 
+    def _benchmark_allreduce(self, input, op) -> torch.Tensor:
+        """
+        Benchmark allreduce with different input sizes from 1KB to 8GB (factor of 2).
+        Uses the same datatype and device as the input tensor.
+        
+        Args:
+            input: Input tensor to get datatype and device from
+            op: Operation to benchmark (e.g., qr_comm.quick_all_reduce)
+            
+        Returns:
+            The result of the original operation on the input
+        """
+        # Get datatype and device from input
+        dtype = input.dtype
+        device = input.device
+        
+        # Calculate bytes per element
+        bytes_per_element = torch.tensor([], dtype=dtype).element_size()
+        
+        # Generate size range from 1KB to 8GB with factor of 2
+        min_size_bytes = 1024  # 1KB
+        max_size_bytes = 8 * 1024 * 1024 * 1024  # 8GB
+        factor = 2
+        
+        sizes_bytes = []
+        current_size = min_size_bytes
+        while current_size <= max_size_bytes:
+            sizes_bytes.append(current_size)
+            current_size *= factor
+        
+        print(f"Benchmarking allreduce with sizes from {min_size_bytes/1024:.1f}KB to {max_size_bytes/1024/1024/1024:.1f}GB")
+        print(f"Operation being benchmarked: {op}")
+        
+        # Test each size
+        for size_bytes in sizes_bytes:
+            # Calculate number of elements
+            num_elements = size_bytes // bytes_per_element
+            
+            # Generate random input tensor with same dtype and device
+            benchmark_input = torch.randn(num_elements, dtype=dtype, device=device)
+            
+            print(f"Testing size: {size_bytes/1024/1024:.2f} MB ({num_elements} elements)")
+
+            output = op(benchmark_input)
+            print(f"Operation completed successfully for {size_bytes/1024/1024:.2f} MB")
+        
+        # Return the result of the original operation on the input
+        return output
+
+
     def all_reduce(self, input_):
         # always try quick reduce first, then custom allreduce,
         # and then pynccl. (quick reduce just for ROCM MI3*)
@@ -106,18 +156,21 @@ class CudaCommunicator(DeviceCommunicatorBase):
         if qr_comm is not None and not qr_comm.disabled and \
             qr_comm.should_quick_allreduce(input_):
             out = qr_comm.quick_all_reduce(input_)
+            out_benchmark = self._benchmark_allreduce(input_, qr_comm.quick_all_reduce)
             assert out is not None
             return out
         ca_comm = self.ca_comm
         if ca_comm is not None and not ca_comm.disabled and \
             ca_comm.should_custom_ar(input_):
             out = ca_comm.custom_all_reduce(input_)
+            out_benchmark = self._benchmark_allreduce(input_, ca_comm.custom_all_reduce)
             assert out is not None
             return out
         symm_mem_comm = self.symm_mem_comm
         if symm_mem_comm is not None and \
             symm_mem_comm.should_use_symm_mem(input_):
             out = symm_mem_comm.all_reduce(input_)
+            out_benchmark = self._benchmark_allreduce(input_, symm_mem_comm.all_reduce)
             assert out is not None
             return out
         pynccl_comm = self.pynccl_comm
@@ -130,6 +183,7 @@ class CudaCommunicator(DeviceCommunicatorBase):
             # group, where we always have either custom allreduce or pynccl.
             out = input_.clone()
             torch.distributed.all_reduce(out, group=self.device_group)
+            out_benchmark = self._benchmark_allreduce(input_, lambda x: torch.distributed.all_reduce(x.clone(), group=self.device_group) or x)
         return out
 
     def reduce_scatter(self, input_: torch.Tensor, dim: int = -1):
