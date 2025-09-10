@@ -116,7 +116,8 @@ class CudaCommunicator(DeviceCommunicatorBase):
         device = input.device
         
         # Calculate bytes per element
-        bytes_per_element = torch.tensor([], dtype=dtype).element_size()
+        # bytes_per_element = torch.tensor([], dtype=dtype).element_size()
+        bytes_per_element = 2
         
         # Generate size range from 1KB to 8GB with factor of 2
         min_size_bytes = 1024  # 1KB
@@ -128,9 +129,10 @@ class CudaCommunicator(DeviceCommunicatorBase):
         while current_size <= max_size_bytes:
             sizes_bytes.append(current_size)
             current_size *= factor
-        
+
         print(f"Benchmarking allreduce with sizes from {min_size_bytes/1024:.1f}KB to {max_size_bytes/1024/1024/1024:.1f}GB")
         print(f"Operation being benchmarked: {op}")
+        print(f"Operation process dtype    : {dtype}")
         
         # Pre-construct all benchmark input tensors
         benchmark_inputs = []
@@ -146,14 +148,14 @@ class CudaCommunicator(DeviceCommunicatorBase):
             print(f"Testing size: {size_bytes/1024/1024:.2f} MB ({num_elements} elements)")
             
             # CUDA sync before operation
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            
+            # if torch.cuda.is_available():
+            #     torch.cuda.synchronize()
+
             output = op(benchmark_input)
-            
+
             # CUDA sync after operation
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
+            # if torch.cuda.is_available():
+                # torch.cuda.synchronize()
             
             print(f"Operation completed successfully for {size_bytes/1024/1024:.2f} MB")
         
