@@ -121,7 +121,8 @@ class CudaCommunicator(DeviceCommunicatorBase):
         
         # Generate size range from 1KB to 8GB with factor of 2
         min_size_bytes = 1024  # 1KB
-        max_size_bytes = 8 * 1024 * 1024 * 1024  # 8GB
+        # max_size_bytes = 8 * 1024 * 1024 * 1024  # 8GB
+        max_size_bytes = 2 * 1024 * 1024 * 1024  # 2GB
         factor = 2
 
         sizes_bytes = []
