@@ -123,7 +123,7 @@ class CudaCommunicator(DeviceCommunicatorBase):
         min_size_bytes = 1024  # 1KB
         max_size_bytes = 8 * 1024 * 1024 * 1024  # 8GB
         factor = 2
-        
+
         sizes_bytes = []
         current_size = min_size_bytes
         while current_size <= max_size_bytes:
@@ -133,7 +133,7 @@ class CudaCommunicator(DeviceCommunicatorBase):
         print(f"Benchmarking allreduce with sizes from {min_size_bytes/1024:.1f}KB to {max_size_bytes/1024/1024/1024:.1f}GB")
         print(f"Operation being benchmarked: {op}")
         print(f"Operation process dtype    : {dtype}")
-        
+
         # Pre-construct all benchmark input tensors
         benchmark_inputs = []
         for size_bytes in sizes_bytes:
@@ -142,26 +142,31 @@ class CudaCommunicator(DeviceCommunicatorBase):
             # Generate random input tensor with same dtype and device
             benchmark_input = torch.randn(num_elements, dtype=dtype, device=device)
             benchmark_inputs.append((size_bytes, num_elements, benchmark_input))
+        print(f"len benchmark_inputs    : {len(benchmark_inputs)}")
 
         # Test each size
         torch.cuda.synchronize()
         for size_bytes, num_elements, benchmark_input in benchmark_inputs:
-            print(f"Testing size: {size_bytes/1024/1024:.2f} MB ({num_elements} elements)")
-            
+            # print(f"Testing size: {size_bytes/1024/1024:.2f} MB ({num_elements} elements)")
+
             # CUDA sync before operation
             # if torch.cuda.is_available():
             #     torch.cuda.synchronize()
 
+            torch.cuda.synchronize()
             output = op(benchmark_input)
+            torch.cuda.synchronize()
+            output = op(benchmark_input)
+            torch.cuda.synchronize()
 
             # CUDA sync after operation
             # if torch.cuda.is_available():
                 # torch.cuda.synchronize()
 
-            print(f"Operation completed successfully for {size_bytes/1024/1024:.2f} MB")
-        
+            # print(f"Operation completed successfully for {size_bytes/1024/1024:.2f} MB")
+
         # Return the result of the original operation on the input
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
         return output
 
 
