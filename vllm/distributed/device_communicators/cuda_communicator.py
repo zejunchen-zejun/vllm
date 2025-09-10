@@ -15,6 +15,9 @@ from .base_device_communicator import DeviceCommunicatorBase
 logger = init_logger(__name__)
 
 
+# global 
+ccnt = 0
+
 class CudaCommunicator(DeviceCommunicatorBase):
 
     def __init__(self,
@@ -100,6 +103,11 @@ class CudaCommunicator(DeviceCommunicatorBase):
                 raise ValueError(f"Unknown all2all backend: {all2all_backend}")
 
     def _benchmark_allreduce(self, input, op) -> torch.Tensor:
+        global ccnt
+        ccnt += 1
+        print('[zejun][ccnt', ccnt, '] bypass the benchmark allreduce', flush=True)
+        if ccnt % 32 == 0:
+            return input
         """
         Benchmark allreduce with different input sizes from 1KB to 8GB (factor of 2).
         Uses the same datatype and device as the input tensor.
@@ -121,7 +129,6 @@ class CudaCommunicator(DeviceCommunicatorBase):
         
         # Generate size range from 1KB to 8GB with factor of 2
         min_size_bytes = 1024  # 1KB
-        # max_size_bytes = 8 * 1024 * 1024 * 1024  # 8GB
         max_size_bytes = 2 * 1024 * 1024 * 1024  # 2GB
         factor = 2
 
