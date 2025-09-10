@@ -132,17 +132,29 @@ class CudaCommunicator(DeviceCommunicatorBase):
         print(f"Benchmarking allreduce with sizes from {min_size_bytes/1024:.1f}KB to {max_size_bytes/1024/1024/1024:.1f}GB")
         print(f"Operation being benchmarked: {op}")
         
-        # Test each size
+        # Pre-construct all benchmark input tensors
+        benchmark_inputs = []
         for size_bytes in sizes_bytes:
             # Calculate number of elements
             num_elements = size_bytes // bytes_per_element
-            
             # Generate random input tensor with same dtype and device
             benchmark_input = torch.randn(num_elements, dtype=dtype, device=device)
-            
-            print(f"Testing size: {size_bytes/1024/1024:.2f} MB ({num_elements} elements)")
+            benchmark_inputs.append((size_bytes, num_elements, benchmark_input))
 
+        # Test each size
+        for size_bytes, num_elements, benchmark_input in benchmark_inputs:
+            print(f"Testing size: {size_bytes/1024/1024:.2f} MB ({num_elements} elements)")
+            
+            # CUDA sync before operation
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            
             output = op(benchmark_input)
+            
+            # CUDA sync after operation
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            
             print(f"Operation completed successfully for {size_bytes/1024/1024:.2f} MB")
         
         # Return the result of the original operation on the input
