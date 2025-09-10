@@ -144,6 +144,7 @@ class CudaCommunicator(DeviceCommunicatorBase):
             benchmark_inputs.append((size_bytes, num_elements, benchmark_input))
 
         # Test each size
+        torch.cuda.synchronize()
         for size_bytes, num_elements, benchmark_input in benchmark_inputs:
             print(f"Testing size: {size_bytes/1024/1024:.2f} MB ({num_elements} elements)")
             
@@ -156,10 +157,11 @@ class CudaCommunicator(DeviceCommunicatorBase):
             # CUDA sync after operation
             # if torch.cuda.is_available():
                 # torch.cuda.synchronize()
-            
+
             print(f"Operation completed successfully for {size_bytes/1024/1024:.2f} MB")
         
         # Return the result of the original operation on the input
+        torch.cuda.synchronize()
         return output
 
 
