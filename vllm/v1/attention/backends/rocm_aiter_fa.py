@@ -317,10 +317,14 @@ class AiterFlashAttentionMetadataBuilder(
         ) = split_ret
 
         query_start_loc_cpu = common_attn_metadata.query_start_loc_cpu
+        print('[zejun] build, query_start_loc_cpu = ', query_start_loc_cpu, flush=True)
 
         seq_lens = common_attn_metadata.seq_lens_cpu
+        print('[zejun] build, seq_lens = ', seq_lens, flush=True)
 
         query_lens_cpu = query_start_loc_cpu[1:] - query_start_loc_cpu[:-1]
+        print('[zejun] build, query_lens_cpu = ', query_lens_cpu, flush=True)
+        print('[zejun] build, common_attn_metadata.query_start_loc = ', common_attn_metadata.query_start_loc, flush=True)
 
         decode_metadata = None
         if num_decodes > 0:
@@ -774,6 +778,7 @@ class AiterFlashAttentionImpl(AttentionImpl):
             # calculate for decodes
             if num_decodes > 0:
                 assert attn_metadata.decode_metadata is not None
+                print('[zejun] -----------------------------', flush=True)
                 print('[zejun] num_decodes = ', num_decodes, flush=True)
                 print('[zejun] num_decode_tokens = ', num_decode_tokens, flush=True)
                 _, num_heads, head_size = query.shape
@@ -787,9 +792,10 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 print('[zejun] head_size = ', head_size, flush=True)
                 print('[zejun] nbytes_per_qo_elem = ', nbytes_per_qo_elem, flush=True)
                 print('[zejun] num_seqs = ', num_seqs, flush=True)
-                print('[zejun] max_num_partitions = ', max_num_partitions, flush=True)
                 print('[zejun] _PARTITION_SIZE_ROCM = ', _PARTITION_SIZE_ROCM, flush=True)
+                print('[zejun] max_num_partitions = ', max_num_partitions, flush=True)
 
+                # TODO: sliding window
                 workspace_buffer = torch.empty(
                     (num_seqs * num_heads * max_num_partitions * head_size)
                     * nbytes_per_qo_elem
@@ -801,7 +807,6 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 print('[zejun] workspace_buffer.shape = ', workspace_buffer.shape, flush=True)
                 print('[zejun] self.sliding_window = ', self.sliding_window, flush=True)
                 print('[zejun] self.scale = ', self.scale, flush=True)
-                print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
                 print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
                 print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
                 print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
@@ -812,13 +817,19 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 print('[zejun] query[:num_decode_tokens].shape = ', query[:num_decode_tokens].shape, flush=True)
                 print('[zejun] key_cache.shape = ', key_cache.shape, flush=True)
                 print('[zejun] value_cache.shape = ', value_cache.shape, flush=True)
+                print('[zejun] key_cache.data_ptr() = ', key_cache.data_ptr(), flush=True)
+                print('[zejun] value_cache.data_ptr() = ', value_cache.data_ptr(), flush=True)
                 print('[zejun] self.scale = ', self.scale, flush=True)
+
+                print('[zejun] attn_metadata.block_table[0,:128] = ', attn_metadata.block_table[0,:128], flush=True)
                 print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
                 print('[zejun] attn_metadata.block_table[:num_decodes].shape = ', attn_metadata.block_table[:num_decodes].shape, flush=True)
 
+                print('[zejun] attn_metadata.query_start_loc = ', attn_metadata.query_start_loc, flush=True)
                 print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
                 print('[zejun] attn_metadata.query_start_loc[:num_decodes].shape = ', attn_metadata.query_start_loc[:num_decodes].shape, flush=True)
 
+                print('[zejun] attn_metadata.seq_lens = ', attn_metadata.seq_lens, flush=True)
                 print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
                 print('[zejun] attn_metadata.seq_lens[:num_decodes].shape = ', attn_metadata.seq_lens[:num_decodes].shape, flush=True)
 
@@ -848,6 +859,7 @@ class AiterFlashAttentionImpl(AttentionImpl):
                     None,
                     _PARTITION_SIZE_ROCM,
                 )
+                print('[zejun] finish call paged_attention_v1', flush=True)
         else:
             raise NotImplementedError(
                 "Cascade attention is not implemented for ROCM AITER"
