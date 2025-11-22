@@ -168,7 +168,7 @@ class AttentionGroup:
         ]
 
     def get_metadata_builder(self, ubatch_id: int = 0) -> AttentionMetadataBuilder:
-        print('[zejun] create_metadata_builders, try to get self.metadata_builders = ', flush=True)
+        print('[zejun] create_metadata_builders, try to get self.metadata_builders', flush=True)
         assert len(self.metadata_builders) > ubatch_id
         return self.metadata_builders[ubatch_id]
 

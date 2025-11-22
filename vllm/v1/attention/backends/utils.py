@@ -775,6 +775,7 @@ def split_decodes_prefills_and_extends(
     seq_lens = common_attn_metadata.seq_lens_cpu
 
     if max_query_len <= decode_threshold:
+        print('[zejun] split_decodes_prefills_and_extends, only decode, return', flush=True)
         return num_reqs, 0, 0, num_tokens, 0, 0
 
     print('[zejun] split_decodes_prefills_and_extends, query_start_loc = ', query_start_loc, flush=True)
@@ -784,6 +785,7 @@ def split_decodes_prefills_and_extends(
     first_extend = is_prefill_or_extend.int().argmax(dim=-1).item()
     first_prefill = is_prefill.int().argmax(dim=-1).item()
     print('[zejun] split_decodes_prefills_and_extends, query_lens = ', query_lens, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, seq_lens(KV) = ', seq_lens, flush=True)
     print('[zejun] split_decodes_prefills_and_extends, is_prefill_or_extend = ', is_prefill_or_extend, flush=True)
     print('[zejun] split_decodes_prefills_and_extends, is_prefill = ', is_prefill, flush=True)
     print('[zejun] split_decodes_prefills_and_extends, first_extend = ', first_extend, flush=True)

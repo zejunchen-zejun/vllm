@@ -318,14 +318,14 @@ class AiterFlashAttentionMetadataBuilder(
         ) = split_ret
 
         query_start_loc_cpu = common_attn_metadata.query_start_loc_cpu
-        print('[zejun] build, query_start_loc_cpu = ', query_start_loc_cpu, flush=True)
+        print('[zejun] AiterFlashAttentionMetadataBuilder build, query_start_loc_cpu = ', query_start_loc_cpu, flush=True)
 
         seq_lens = common_attn_metadata.seq_lens_cpu
-        print('[zejun] build, seq_lens = ', seq_lens, flush=True)
+        print('[zejun] AiterFlashAttentionMetadataBuilder build, seq_lens(kv) = ', seq_lens, flush=True)
 
         query_lens_cpu = query_start_loc_cpu[1:] - query_start_loc_cpu[:-1]
-        print('[zejun] build, query_lens_cpu = ', query_lens_cpu, flush=True)
-        print('[zejun] build, common_attn_metadata.query_start_loc = ', common_attn_metadata.query_start_loc, flush=True)
+        print('[zejun] AiterFlashAttentionMetadataBuilder build, query_lens_cpu = ', query_lens_cpu, flush=True)
+        print('[zejun] AiterFlashAttentionMetadataBuilder build, common_attn_metadata.query_start_loc = ', common_attn_metadata.query_start_loc, flush=True)
 
         decode_metadata = None
         if num_decodes > 0:
@@ -356,10 +356,19 @@ class AiterFlashAttentionMetadataBuilder(
             seq_lens_for_extend = common_attn_metadata.seq_lens_cpu[num_extends_slice]
             computed_kv_lens = seq_lens_for_extend - query_lens_for_extend
 
+            print('[zejun] AiterFlashAttentionMetadataBuilder build, num_extends_slice = ', num_extends_slice, flush=True)
+            print('[zejun] AiterFlashAttentionMetadataBuilder build, query_lens_for_extend = ', query_lens_for_extend, flush=True)
+            print('[zejun] AiterFlashAttentionMetadataBuilder build, seq_lens_for_extend = ', seq_lens_for_extend, flush=True)
+            print('[zejun] AiterFlashAttentionMetadataBuilder build, computed_kv_lens = ', computed_kv_lens, flush=True)
+
             # allocate the equal amount of workspace for
             # each chunk prefill request
             max_context_chunk = _CP_TOKENS_PER_ITER_ROCM // num_extends
             num_chunks = cdiv(computed_kv_lens.max().item(), max_context_chunk)
+
+            print('[zejun] AiterFlashAttentionMetadataBuilder build, num_extends = ', num_extends, flush=True)
+            print('[zejun] AiterFlashAttentionMetadataBuilder build, max_context_chunk = ', max_context_chunk, flush=True)
+            print('[zejun] AiterFlashAttentionMetadataBuilder build, num_chunks = ', num_chunks, flush=True)
 
             chunk_starts = (
                 torch.arange(num_chunks, dtype=torch.int32)
@@ -587,6 +596,20 @@ class AiterFlashAttentionImpl(AttentionImpl):
         chunked_lse = None
         print('[zejun] extend_forward, num_chunks = ', num_chunks, flush=True)
         for chunk_idx in range(num_chunks):
+            print('[zejun] extend_forward, chunk_idx = ', chunk_idx, flush=True)
+            print('[zejun] extend_forward, key_cache shape = ', key_cache.shape, flush=True)
+            print('[zejun] extend_forward, value_cache shape = ', value_cache.shape, flush=True)
+            print('[zejun] extend_forward, key_fetched shape = ', key_fetched.shape, flush=True)
+            print('[zejun] extend_forward, value_fetched shape = ', value_fetched.shape, flush=True)
+            print('[zejun] extend_forward, block_table shape = ', block_table.shape, flush=True)
+            print('[zejun] extend_forward, cu_seqlens_kv shape = ', cu_seqlens_kv.shape, flush=True)
+            print('[zejun] extend_forward, cu_seqlens_kv[chunk_idx] = ', cu_seqlens_kv[chunk_idx], flush=True)
+            print('[zejun] extend_forward, token_to_batch shape = ', token_to_batch.shape, flush=True)
+            print('[zejun] extend_forward, token_to_batch[chunk_idx] = ', token_to_batch[chunk_idx], flush=True)
+            print('[zejun] extend_forward, chunk_starts shape = ', chunk_starts.shape, flush=True)
+            print('[zejun] extend_forward, chunk_starts[chunk_idx] = ', chunk_starts[chunk_idx], flush=True)
+            print('[zejun] extend_forward, total_token_per_batch shape = ', total_token_per_batch.shape, flush=True)
+            print('[zejun] extend_forward, total_token_per_batch[chunk_idx] = ', total_token_per_batch[chunk_idx], flush=True)
             cp_mha_gather_cache(
                 key_cache=key_cache,
                 value_cache=value_cache,
