@@ -185,7 +185,7 @@ class RocmAiterUnifiedAttentionImpl(RocmAttentionImpl):
         descale_shape = (cu_seqlens_q.shape[0] - 1, key.shape[1])
 
         print('[zejun] RocmAiterUnifiedAttentionImpl forward, query[:num_actual_tokens].shape = ', query[:num_actual_tokens].shape, flush=True)
-        print('[zejun] RocmAiterUnifiedAttentionImpl forward, query = ', query, flush=True)
+        # print('[zejun] RocmAiterUnifiedAttentionImpl forward, query = ', query, flush=True)
         print('[zejun] RocmAiterUnifiedAttentionImpl forward, cu_seqlens_q = ', cu_seqlens_q, flush=True)
         print('[zejun] RocmAiterUnifiedAttentionImpl forward, seqused_k = ', seqused_k, flush=True)
         print('[zejun] RocmAiterUnifiedAttentionImpl forward, max_seqlen_q = ', max_seqlen_q, flush=True)

@@ -123,6 +123,8 @@ class CohereMLP(nn.Module):
         x, _ = self.down_proj(x)
         return x
 
+ccntstep=-2
+ccntlayer=0
 
 class CohereAttention(nn.Module):
     def __init__(
@@ -232,6 +234,16 @@ class CohereAttention(nn.Module):
             q, k = self._apply_qk_norm(q, k)
         if self.v1 or self.sliding_window:
             q, k = self.rotary_emb(positions, q, k)
+        
+        global ccntstep, ccntlayer
+
+        print('[zejun] CohereAttention[step.', ccntstep,'][layer.', ccntlayer, ']-----------------', flush=True)
+        ccntlayer += 1
+
+        if ccntlayer % 31 == 0:
+            ccntlayer = 0
+            ccntstep += 1
+
         attn_output = self.attn(q, k, v)
         output, _ = self.o_proj(attn_output)
         return output
