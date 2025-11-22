@@ -821,7 +821,8 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 print('[zejun] value_cache.data_ptr() = ', value_cache.data_ptr(), flush=True)
                 print('[zejun] self.scale = ', self.scale, flush=True)
 
-                print('[zejun] attn_metadata.block_table[0,:128] = ', attn_metadata.block_table[0,:128], flush=True)
+                print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
+                print('[zejun] attn_metadata.block_table[0,7743:] = \n', attn_metadata.block_table[0,7743:], flush=True)
                 print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
                 print('[zejun] attn_metadata.block_table[:num_decodes].shape = ', attn_metadata.block_table[:num_decodes].shape, flush=True)
 
@@ -831,6 +832,7 @@ class AiterFlashAttentionImpl(AttentionImpl):
 
                 print('[zejun] attn_metadata.seq_lens = ', attn_metadata.seq_lens, flush=True)
                 print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
+                print('[zejun] attn_metadata.seq_lens[:num_decodes] = ', attn_metadata.seq_lens[:num_decodes], flush=True)
                 print('[zejun] attn_metadata.seq_lens[:num_decodes].shape = ', attn_metadata.seq_lens[:num_decodes].shape, flush=True)
 
                 print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
