@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Attention layer with AiterFlashAttention."""
 
+import warnings
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -505,10 +506,19 @@ class AiterFlashAttentionImpl(AttentionImpl):
         if alibi_slopes is not None:
             alibi_slopes = torch.tensor(alibi_slopes, dtype=torch.float32)
         self.alibi_slopes = alibi_slopes
+
+        # FIXME: As a WA, use rocm unified attention as PA when sliding window is required        
+        self.fallback_to_rocm_unified_attn = False
         if sliding_window is None:
             self.sliding_window = [-1, -1]
         else:
             self.sliding_window = [sliding_window - 1, 0]
+            self.fallback_to_rocm_unified_attn = True
+            from aiter.ops.triton.unified_attention import unified_attention
+            self.rocm_unified_attn_impl = unified_attention
+            logger.warning("Fallback to rocm unified attention for decode when \
+                sliding window is required in AITER FA backend")
+
         self.kv_cache_dtype = kv_cache_dtype
         if logits_soft_cap is None:
             # In flash-attn, setting logits_soft_cap as 0 means no soft cap.
@@ -835,91 +845,143 @@ class AiterFlashAttentionImpl(AttentionImpl):
 
             # calculate for decodes
             if num_decodes > 0:
-                assert attn_metadata.decode_metadata is not None
-                print('[zejun] -----------------------------', flush=True)
-                print('[zejun] num_decodes = ', num_decodes, flush=True)
-                print('[zejun] num_decode_tokens = ', num_decode_tokens, flush=True)
-                _, num_heads, head_size = query.shape
-                nbytes_per_qo_elem = torch.finfo(query.dtype).bits // 8
-                num_seqs = attn_metadata.seq_lens.shape[0]
-                max_num_partitions = (
-                    attn_metadata.max_seq_len + _PARTITION_SIZE_ROCM - 1
-                ) // _PARTITION_SIZE_ROCM
 
-                print('[zejun] num_heads = ', num_heads, flush=True)
-                print('[zejun] head_size = ', head_size, flush=True)
-                print('[zejun] nbytes_per_qo_elem = ', nbytes_per_qo_elem, flush=True)
-                print('[zejun] num_seqs = ', num_seqs, flush=True)
-                print('[zejun] _PARTITION_SIZE_ROCM = ', _PARTITION_SIZE_ROCM, flush=True)
-                print('[zejun] max_num_partitions = ', max_num_partitions, flush=True)
+                # fallback to rocm unified attention when sliding window is required
+                if self.fallback_to_rocm_unified_attn:
+                    assert output is not None, "Output tensor must be provided for rocm unified attention"
+                    descale_shape = (cu_seqlens_q.shape[0] - 1, key.shape[1])
+                    self.rocm_unified_attn_impl(
+                        q=query[:num_actual_tokens],
+                        k=key_cache,
+                        v=value_cache,
+                        out=output[:num_actual_tokens],
+                        cu_seqlens_q=cu_seqlens_q,
+                        max_seqlen_q=max_seqlen_q,
+                        seqused_k=seqused_k,
+                        max_seqlen_k=max_seqlen_k,
+                        softmax_scale=self.scale,
+                        causal=True,
+                        alibi_slopes=self.alibi_slopes,
+                        window_size=self.sliding_window,
+                        block_table=block_table,
+                        softcap=self.logits_soft_cap,
+                        q_descale=None,  # Not supported
+                        k_descale=layer._k_scale.expand(descale_shape),
+                        v_descale=layer._v_scale.expand(descale_shape),
+                        sinks=self.sinks,
+                        output_scale=output_scale,
+                    )
 
-                # TODO: sliding window
-                workspace_buffer = torch.empty(
-                    (num_seqs * num_heads * max_num_partitions * head_size)
-                    * nbytes_per_qo_elem
-                    + 2 * (num_seqs * num_heads * max_num_partitions) * 4,
-                    dtype=torch.uint8,
-                    device=output.device,
-                )
 
-                print('[zejun] workspace_buffer.shape = ', workspace_buffer.shape, flush=True)
-                print('[zejun] self.sliding_window = ', self.sliding_window, flush=True)
-                print('[zejun] self.scale = ', self.scale, flush=True)
-                print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
-                print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
-                print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
-                print('[zejun] self.alibi_slopes = ', self.alibi_slopes, flush=True)
-                print('[zejun] self.kv_cache_dtype = ', self.kv_cache_dtype, flush=True)
 
-                print('[zejun] query.shape = ', query.shape, flush=True)
-                print('[zejun] query[:num_decode_tokens].shape = ', query[:num_decode_tokens].shape, flush=True)
-                print('[zejun] key_cache.shape = ', key_cache.shape, flush=True)
-                print('[zejun] value_cache.shape = ', value_cache.shape, flush=True)
-                print('[zejun] key_cache.data_ptr() = ', key_cache.data_ptr(), flush=True)
-                print('[zejun] value_cache.data_ptr() = ', value_cache.data_ptr(), flush=True)
-                print('[zejun] self.scale = ', self.scale, flush=True)
+                else:
+                    assert attn_metadata.decode_metadata is not None
+                    print('[zejun] -----------------------------', flush=True)
+                    print('[zejun] num_decodes = ', num_decodes, flush=True)
+                    print('[zejun] num_decode_tokens = ', num_decode_tokens, flush=True)
+                    _, num_heads, head_size = query.shape
+                    nbytes_per_qo_elem = torch.finfo(query.dtype).bits // 8
+                    num_seqs = attn_metadata.seq_lens.shape[0]
+                    max_num_partitions = (
+                        attn_metadata.max_seq_len + _PARTITION_SIZE_ROCM - 1
+                    ) // _PARTITION_SIZE_ROCM
 
-                # print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
-                # print('[zejun] attn_metadata.block_table[0,7743:] = \n', attn_metadata.block_table[0,7743:], flush=True)
-                print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
-                print('[zejun] attn_metadata.block_table[:num_decodes].shape = ', attn_metadata.block_table[:num_decodes].shape, flush=True)
+                    print('[zejun] num_heads = ', num_heads, flush=True)
+                    print('[zejun] head_size = ', head_size, flush=True)
+                    print('[zejun] nbytes_per_qo_elem = ', nbytes_per_qo_elem, flush=True)
+                    print('[zejun] num_seqs = ', num_seqs, flush=True)
+                    print('[zejun] _PARTITION_SIZE_ROCM = ', _PARTITION_SIZE_ROCM, flush=True)
+                    print('[zejun] max_num_partitions = ', max_num_partitions, flush=True)
 
-                print('[zejun] attn_metadata.query_start_loc = ', attn_metadata.query_start_loc, flush=True)
-                print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
-                print('[zejun] attn_metadata.query_start_loc[:num_decodes].shape = ', attn_metadata.query_start_loc[:num_decodes].shape, flush=True)
+                    workspace_buffer = torch.empty(
+                        (num_seqs * num_heads * max_num_partitions * head_size)
+                        * nbytes_per_qo_elem
+                        + 2 * (num_seqs * num_heads * max_num_partitions) * 4,
+                        dtype=torch.uint8,
+                        device=output.device,
+                    )
 
-                print('[zejun] attn_metadata.seq_lens = ', attn_metadata.seq_lens, flush=True)
-                print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
-                print('[zejun] attn_metadata.seq_lens[:num_decodes] = ', attn_metadata.seq_lens[:num_decodes], flush=True)
-                print('[zejun] attn_metadata.seq_lens[:num_decodes].shape = ', attn_metadata.seq_lens[:num_decodes].shape, flush=True)
+                    print('[zejun] workspace_buffer.shape = ', workspace_buffer.shape, flush=True)
+                    print('[zejun] self.sliding_window = ', self.sliding_window, flush=True)
+                    print('[zejun] self.scale = ', self.scale, flush=True)
+                    print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
+                    print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
+                    print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
+                    print('[zejun] self.alibi_slopes = ', self.alibi_slopes, flush=True)
+                    print('[zejun] self.kv_cache_dtype = ', self.kv_cache_dtype, flush=True)
 
-                print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
-                print('[zejun] self.logits_soft_cap = ', self.logits_soft_cap, flush=True)
-                print('[zejun] layer._k_scale = ', layer._k_scale, flush=True)
-                print('[zejun] layer._v_scale = ', layer._v_scale, flush=True)
+                    print('[zejun] query.shape = ', query.shape, flush=True)
+                    print('[zejun] query[:num_decode_tokens].shape = ', query[:num_decode_tokens].shape, flush=True)
+                    print('[zejun] key_cache.shape = ', key_cache.shape, flush=True)
+                    print('[zejun] value_cache.shape = ', value_cache.shape, flush=True)
+                    print('[zejun] key_cache.data_ptr() = ', key_cache.data_ptr(), flush=True)
+                    print('[zejun] value_cache.data_ptr() = ', value_cache.data_ptr(), flush=True)
+                    print('[zejun] self.scale = ', self.scale, flush=True)
 
-                print('[zejun] call paged_attention_v1', flush=True)
-                torch.ops.aiter.paged_attention_v1(
-                    output[:num_decode_tokens],
-                    workspace_buffer,
-                    query[:num_decode_tokens],
-                    key_cache,
-                    value_cache,
-                    self.scale,
-                    attn_metadata.block_table[:num_decodes],
-                    attn_metadata.query_start_loc[:num_decodes],
-                    attn_metadata.seq_lens[:num_decodes],
-                    attn_metadata.max_seq_len,
-                    self.alibi_slopes,
-                    self.kv_cache_dtype,
-                    "NHD",
-                    self.logits_soft_cap,
-                    layer._k_scale,
-                    layer._v_scale,
-                    None,
-                    _PARTITION_SIZE_ROCM,
-                )
-                print('[zejun] finish call paged_attention_v1', flush=True)
+                    # print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
+                    # print('[zejun] attn_metadata.block_table[0,7743:] = \n', attn_metadata.block_table[0,7743:], flush=True)
+                    print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
+                    print('[zejun] attn_metadata.block_table[:num_decodes].shape = ', attn_metadata.block_table[:num_decodes].shape, flush=True)
+
+                    print('[zejun] attn_metadata.query_start_loc = ', attn_metadata.query_start_loc, flush=True)
+                    print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
+                    print('[zejun] attn_metadata.query_start_loc[:num_decodes].shape = ', attn_metadata.query_start_loc[:num_decodes].shape, flush=True)
+
+                    print('[zejun] attn_metadata.seq_lens = ', attn_metadata.seq_lens, flush=True)
+                    print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
+                    print('[zejun] attn_metadata.seq_lens[:num_decodes] = ', attn_metadata.seq_lens[:num_decodes], flush=True)
+                    print('[zejun] attn_metadata.seq_lens[:num_decodes].shape = ', attn_metadata.seq_lens[:num_decodes].shape, flush=True)
+
+                    print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
+                    print('[zejun] self.logits_soft_cap = ', self.logits_soft_cap, flush=True)
+                    print('[zejun] layer._k_scale = ', layer._k_scale, flush=True)
+                    print('[zejun] layer._v_scale = ', layer._v_scale, flush=True)
+
+                    print('[zejun] call paged_attention_v1', flush=True)
+                    torch.ops.aiter.paged_attention_v1(
+                        output[:num_decode_tokens],
+                        workspace_buffer,
+                        query[:num_decode_tokens],
+                        key_cache,
+                        value_cache,
+                        self.scale,
+                        attn_metadata.block_table[:num_decodes],
+                        attn_metadata.query_start_loc[:num_decodes],
+                        attn_metadata.seq_lens[:num_decodes],
+                        attn_metadata.max_seq_len,
+                        self.alibi_slopes,
+                        self.kv_cache_dtype,
+                        "NHD",
+                        self.logits_soft_cap,
+                        layer._k_scale,
+                        layer._v_scale,
+                        None,
+                        _PARTITION_SIZE_ROCM,
+                    )
+                    def paged_attn_decode_v2(
+                        output: torch.Tensor,  # [num_seqs, num_kv_heads*query_grp_sz, head_sz],
+                        query: torch.Tensor,  # [num_seqs, num_kv_heads*query_grp_sz, head_sz],
+                        key_cache: torch.Tensor,  # [num_blks, num_kv_heads, kv_blk_sz, head_sz] ,
+                        value_cache: torch.Tensor,  # [num_blks, num_kv_heads, kv_blk_sz, head_sz] ,
+                        sinks: Optional[torch.Tensor],  # [num_query_heads],
+                        block_tables: torch.Tensor,  # [num_seqs, max_num_blks_per_seq],
+                        seq_lens: torch.Tensor,  # [num_seqs],
+                        max_seq_len: int,
+                        compute_type,
+                        num_kv_heads: int,
+                        scale: float,
+                        alibi_slopes: Optional[torch.Tensor],
+                        k_scale: torch.Tensor,
+                        v_scale: torch.Tensor,
+                        max_num_partitions: int,
+                        tp_rank: int = 0,
+                        blocksparse_local_blocks: int = 0,
+                        blocksparse_vert_stride: int = 0,
+                        blocksparse_block_size: int = 64,
+                        blocksparse_head_sliding_step: int = 0,
+                        sliding_window: int = 0,
+                    ):
+                    print('[zejun] finish call paged_attention_v1', flush=True)
         else:
             raise NotImplementedError(
                 "Cascade attention is not implemented for ROCM AITER"

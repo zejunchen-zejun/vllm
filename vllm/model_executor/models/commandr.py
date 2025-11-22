@@ -240,7 +240,7 @@ class CohereAttention(nn.Module):
         print('[zejun] CohereAttention[step.', ccntstep,'][layer.', ccntlayer, ']-----------------', flush=True)
         ccntlayer += 1
 
-        if ccntlayer % 31 == 0:
+        if ccntlayer % 32 == 0:
             ccntlayer = 0
             ccntstep += 1
 
