@@ -1432,6 +1432,7 @@ class GPUModelRunner(
                         ],
                     )
 
+                print('[zejun] build_attention_metadata, ubatch_slices is not None = ', ubatch_slices is not None, flush=True)
                 if ubatch_slices is not None:
                     common_attn_metadata_list = split_attn_metadata(
                         ubatch_slices, common_attn_metadata
@@ -2575,6 +2576,13 @@ class GPUModelRunner(
 
                 total_num_scheduled_tokens = scheduler_output.total_num_scheduled_tokens
                 use_spec_decode = len(scheduler_output.scheduled_spec_decode_tokens) > 0
+
+                print('[zejun] execute_model, try to build attention metadata = ', flush=True)
+                print('[zejun] execute_model, total_num_scheduled_tokens = ', total_num_scheduled_tokens, flush=True)
+                print('[zejun] execute_model, max_num_scheduled_tokens = ', max_num_scheduled_tokens, flush=True)
+                print('[zejun] execute_model, num_reqs = ', num_reqs, flush=True)
+                print('[zejun] execute_model, ubatch_slices = ', ubatch_slices, flush=True)
+                print('[zejun] execute_model, logits_indices shape = ', logits_indices.shape, flush=True)
                 attn_metadata, spec_decode_common_attn_metadata = (
                     self._build_attention_metadata(
                         total_num_scheduled_tokens=total_num_scheduled_tokens,

@@ -409,6 +409,11 @@ class Attention(nn.Module, AttentionLayerBase):
                 if isinstance(attn_metadata, dict):
                     attn_metadata = attn_metadata[self.layer_name]
                 self_kv_cache = self.kv_cache[forward_context.virtual_engine]
+                print('[zejun] Attention forward, query shape = ', query.shape, flush=True)
+                print('[zejun] Attention forward, key shape = ', key.shape, flush=True)
+                print('[zejun] Attention forward, value shape = ', value.shape, flush=True)
+                print('[zejun] Attention forward, output shape = ', output.shape, flush=True)
+                print('[zejun] Attention forward, self_kv_cache shape = ', self_kv_cache.shape, flush=True)
                 self.impl.forward(
                     self, query, key, value, self_kv_cache, attn_metadata, output=output
                 )

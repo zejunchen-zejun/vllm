@@ -537,7 +537,7 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 "FlashAttentionImpl"
             )
 
-        print('[zejun] AiterFlashAttentionImpl __init__, self.sliding_window = ', self.sliding_window, flush=True)
+        print('[zejun] AiterFlashAttentionImpl __init__, self.sliding_window = ', self.sliding_window, '. self.fallback_to_rocm_unified_attn = ', self.fallback_to_rocm_unified_attn, flush=True)
 
     def extend_forward(
         self,
@@ -585,6 +585,7 @@ class AiterFlashAttentionImpl(AttentionImpl):
         key_fetched, value_fetched = workspace[0], workspace[1]
         chunked_output = None
         chunked_lse = None
+        print('[zejun] extend_forward, num_chunks = ', num_chunks, flush=True)
         for chunk_idx in range(num_chunks):
             cp_mha_gather_cache(
                 key_cache=key_cache,
@@ -783,8 +784,16 @@ class AiterFlashAttentionImpl(AttentionImpl):
         num_prefills = attn_metadata.num_prefills
         num_extends = attn_metadata.num_extends
 
+        print('[zejun] num_prefills = ', num_prefills, flush=True)
+        print('[zejun] num_extends = ', num_extends, flush=True)
+        print('[zejun] num_decodes = ', num_decodes, flush=True)
+
         num_decode_tokens = attn_metadata.num_decode_tokens
         num_extend_tokens = attn_metadata.num_extend_tokens
+        print('[zejun] num_decode_tokens = ', num_decode_tokens, flush=True)
+        print('[zejun] num_extend_tokens = ', num_extend_tokens, flush=True)
+        print('[zejun] attn_metadata.use_cascade = ', attn_metadata.use_cascade, flush=True)
+
         if not attn_metadata.use_cascade:
             # calculate for pure prefills
             if num_prefills > 0:
@@ -793,6 +802,10 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 prefill_query = query[num_decode_tokens + num_extend_tokens :]
                 prefill_key = key[num_decode_tokens + num_extend_tokens :]
                 prefill_value = value[num_decode_tokens + num_extend_tokens :]
+
+                print('[zejun] num_prefills > 0, prefill_query shape = ', prefill_query.shape, flush=True)
+                print('[zejun] num_prefills > 0, prefill_key shape = ', prefill_key.shape, flush=True)
+                print('[zejun] num_prefills > 0, prefill_value shape = ', prefill_value.shape, flush=True)
 
                 aiter.flash_attn_varlen_func(
                     q=prefill_query,
@@ -847,33 +860,32 @@ class AiterFlashAttentionImpl(AttentionImpl):
             if num_decodes > 0:
 
                 # fallback to rocm unified attention when sliding window is required
-                if self.fallback_to_rocm_unified_attn:
-                    assert output is not None, "Output tensor must be provided for rocm unified attention"
-                    descale_shape = (cu_seqlens_q.shape[0] - 1, key.shape[1])
-                    self.rocm_unified_attn_impl(
-                        q=query[:num_actual_tokens],
-                        k=key_cache,
-                        v=value_cache,
-                        out=output[:num_actual_tokens],
-                        cu_seqlens_q=cu_seqlens_q,
-                        max_seqlen_q=max_seqlen_q,
-                        seqused_k=seqused_k,
-                        max_seqlen_k=max_seqlen_k,
-                        softmax_scale=self.scale,
-                        causal=True,
-                        alibi_slopes=self.alibi_slopes,
-                        window_size=self.sliding_window,
-                        block_table=block_table,
-                        softcap=self.logits_soft_cap,
-                        q_descale=None,  # Not supported
-                        k_descale=layer._k_scale.expand(descale_shape),
-                        v_descale=layer._v_scale.expand(descale_shape),
-                        sinks=self.sinks,
-                        output_scale=output_scale,
-                    )
-
-
-
+                # if self.fallback_to_rocm_unified_attn:
+                if 0:
+                    pass
+                    # assert output is not None, "Output tensor must be provided for rocm unified attention"
+                    # descale_shape = (cu_seqlens_q.shape[0] - 1, key.shape[1])
+                    # self.rocm_unified_attn_impl(
+                    #     q=query[:num_actual_tokens],
+                    #     k=key_cache,
+                    #     v=value_cache,
+                    #     out=output[:num_actual_tokens],
+                    #     cu_seqlens_q=cu_seqlens_q,
+                    #     max_seqlen_q=max_seqlen_q,
+                    #     seqused_k=seqused_k,
+                    #     max_seqlen_k=max_seqlen_k,
+                    #     softmax_scale=self.scale,
+                    #     causal=True,
+                    #     alibi_slopes=self.alibi_slopes,
+                    #     window_size=self.sliding_window,
+                    #     block_table=block_table,
+                    #     softcap=self.logits_soft_cap,
+                    #     q_descale=None,  # Not supported
+                    #     k_descale=layer._k_scale.expand(descale_shape),
+                    #     v_descale=layer._v_scale.expand(descale_shape),
+                    #     sinks=self.sinks,
+                    #     output_scale=output_scale,
+                    # )
                 else:
                     assert attn_metadata.decode_metadata is not None
                     print('[zejun] -----------------------------', flush=True)
@@ -918,8 +930,10 @@ class AiterFlashAttentionImpl(AttentionImpl):
                     print('[zejun] value_cache.data_ptr() = ', value_cache.data_ptr(), flush=True)
                     print('[zejun] self.scale = ', self.scale, flush=True)
 
-                    # print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
+                    print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
                     # print('[zejun] attn_metadata.block_table[0,7743:] = \n', attn_metadata.block_table[0,7743:], flush=True)
+                    ccnt_nonzero = torch.nonzero(attn_metadata.block_table)
+                    print('[zejun] block table non zero shape = ', ccnt_nonzero.shape, flush=True)
                     print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
                     print('[zejun] attn_metadata.block_table[:num_decodes].shape = ', attn_metadata.block_table[:num_decodes].shape, flush=True)
 
@@ -958,30 +972,6 @@ class AiterFlashAttentionImpl(AttentionImpl):
                         None,
                         _PARTITION_SIZE_ROCM,
                     )
-                    def paged_attn_decode_v2(
-                        output: torch.Tensor,  # [num_seqs, num_kv_heads*query_grp_sz, head_sz],
-                        query: torch.Tensor,  # [num_seqs, num_kv_heads*query_grp_sz, head_sz],
-                        key_cache: torch.Tensor,  # [num_blks, num_kv_heads, kv_blk_sz, head_sz] ,
-                        value_cache: torch.Tensor,  # [num_blks, num_kv_heads, kv_blk_sz, head_sz] ,
-                        sinks: Optional[torch.Tensor],  # [num_query_heads],
-                        block_tables: torch.Tensor,  # [num_seqs, max_num_blks_per_seq],
-                        seq_lens: torch.Tensor,  # [num_seqs],
-                        max_seq_len: int,
-                        compute_type,
-                        num_kv_heads: int,
-                        scale: float,
-                        alibi_slopes: Optional[torch.Tensor],
-                        k_scale: torch.Tensor,
-                        v_scale: torch.Tensor,
-                        max_num_partitions: int,
-                        tp_rank: int = 0,
-                        blocksparse_local_blocks: int = 0,
-                        blocksparse_vert_stride: int = 0,
-                        blocksparse_block_size: int = 64,
-                        blocksparse_head_sliding_step: int = 0,
-                        sliding_window: int = 0,
-                    ):
-                    print('[zejun] finish call paged_attention_v1', flush=True)
         else:
             raise NotImplementedError(
                 "Cascade attention is not implemented for ROCM AITER"

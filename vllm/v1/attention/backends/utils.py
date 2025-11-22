@@ -777,11 +777,17 @@ def split_decodes_prefills_and_extends(
     if max_query_len <= decode_threshold:
         return num_reqs, 0, 0, num_tokens, 0, 0
 
+    print('[zejun] split_decodes_prefills_and_extends, query_start_loc = ', query_start_loc, flush=True)
     query_lens = query_start_loc[1:] - query_start_loc[:-1]
     is_prefill_or_extend = query_lens > decode_threshold
     is_prefill = (seq_lens == query_lens) & is_prefill_or_extend
     first_extend = is_prefill_or_extend.int().argmax(dim=-1).item()
     first_prefill = is_prefill.int().argmax(dim=-1).item()
+    print('[zejun] split_decodes_prefills_and_extends, query_lens = ', query_lens, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, is_prefill_or_extend = ', is_prefill_or_extend, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, is_prefill = ', is_prefill, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, first_extend = ', first_extend, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, first_prefill = ', first_prefill, flush=True)
     num_decodes = first_extend
     num_decode_tokens = query_start_loc[first_extend].item()
     if not torch.any(is_prefill_or_extend):
@@ -789,6 +795,9 @@ def split_decodes_prefills_and_extends(
 
     num_prefills_or_extends = num_reqs - num_decodes
     num_prefill_or_extend_tokens = num_tokens - num_decode_tokens
+    print('[zejun] split_decodes_prefills_and_extends, num_prefills_or_extends = ', num_prefills_or_extends, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, num_prefill_or_extend_tokens = ', num_prefill_or_extend_tokens, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, torch.any(is_prefill) = ', torch.any(is_prefill), flush=True)
     if not torch.any(is_prefill):
         return (
             num_decodes,
@@ -804,6 +813,12 @@ def split_decodes_prefills_and_extends(
 
     num_prefill_tokens = num_tokens - query_start_loc[first_prefill]
     num_extend_tokens = num_prefill_or_extend_tokens - num_prefill_tokens
+
+    print('[zejun] split_decodes_prefills_and_extends, num_extends = ', num_extends, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, num_prefills = ', num_prefills, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, num_prefill_tokens = ', num_prefill_tokens, flush=True)
+    print('[zejun] split_decodes_prefills_and_extends, num_extend_tokens = ', num_extend_tokens, flush=True)
+
     return (
         num_decodes,
         num_extends,

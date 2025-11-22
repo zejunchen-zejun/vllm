@@ -156,6 +156,7 @@ class AttentionGroup:
             if kernel_block_size is not None
             else self.kv_cache_spec
         )
+        print('[zejun] create_metadata_builders, try to create self.metadata_builders = ', flush=True)
         self.metadata_builders = [
             self.backend.get_builder_cls()(
                 kv_cache_spec_builder,
@@ -167,6 +168,7 @@ class AttentionGroup:
         ]
 
     def get_metadata_builder(self, ubatch_id: int = 0) -> AttentionMetadataBuilder:
+        print('[zejun] create_metadata_builders, try to get self.metadata_builders = ', flush=True)
         assert len(self.metadata_builders) > ubatch_id
         return self.metadata_builders[ubatch_id]
 
