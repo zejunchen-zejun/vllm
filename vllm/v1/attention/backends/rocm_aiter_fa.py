@@ -2,7 +2,6 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Attention layer with AiterFlashAttention."""
 
-import warnings
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -318,14 +317,30 @@ class AiterFlashAttentionMetadataBuilder(
         ) = split_ret
 
         query_start_loc_cpu = common_attn_metadata.query_start_loc_cpu
-        print('[zejun] AiterFlashAttentionMetadataBuilder build, query_start_loc_cpu = ', query_start_loc_cpu, flush=True)
+        print(
+            "[zejun] AiterFlashAttentionMetadataBuilder build, query_start_loc_cpu = ",
+            query_start_loc_cpu,
+            flush=True,
+        )
 
         seq_lens = common_attn_metadata.seq_lens_cpu
-        print('[zejun] AiterFlashAttentionMetadataBuilder build, seq_lens(kv) = ', seq_lens, flush=True)
+        print(
+            "[zejun] AiterFlashAttentionMetadataBuilder build, seq_lens(kv) = ",
+            seq_lens,
+            flush=True,
+        )
 
         query_lens_cpu = query_start_loc_cpu[1:] - query_start_loc_cpu[:-1]
-        print('[zejun] AiterFlashAttentionMetadataBuilder build, query_lens_cpu = ', query_lens_cpu, flush=True)
-        print('[zejun] AiterFlashAttentionMetadataBuilder build, common_attn_metadata.query_start_loc = ', common_attn_metadata.query_start_loc, flush=True)
+        print(
+            "[zejun] AiterFlashAttentionMetadataBuilder build, query_lens_cpu = ",
+            query_lens_cpu,
+            flush=True,
+        )
+        print(
+            "[zejun] AiterFlashAttentionMetadataBuilder build, common_attn_metadata.query_start_loc = ",
+            common_attn_metadata.query_start_loc,
+            flush=True,
+        )
 
         decode_metadata = None
         if num_decodes > 0:
@@ -356,19 +371,47 @@ class AiterFlashAttentionMetadataBuilder(
             seq_lens_for_extend = common_attn_metadata.seq_lens_cpu[num_extends_slice]
             computed_kv_lens = seq_lens_for_extend - query_lens_for_extend
 
-            print('[zejun] AiterFlashAttentionMetadataBuilder build, num_extends_slice = ', num_extends_slice, flush=True)
-            print('[zejun] AiterFlashAttentionMetadataBuilder build, query_lens_for_extend = ', query_lens_for_extend, flush=True)
-            print('[zejun] AiterFlashAttentionMetadataBuilder build, seq_lens_for_extend = ', seq_lens_for_extend, flush=True)
-            print('[zejun] AiterFlashAttentionMetadataBuilder build, computed_kv_lens = ', computed_kv_lens, flush=True)
+            print(
+                "[zejun] AiterFlashAttentionMetadataBuilder build, num_extends_slice = ",
+                num_extends_slice,
+                flush=True,
+            )
+            print(
+                "[zejun] AiterFlashAttentionMetadataBuilder build, query_lens_for_extend = ",
+                query_lens_for_extend,
+                flush=True,
+            )
+            print(
+                "[zejun] AiterFlashAttentionMetadataBuilder build, seq_lens_for_extend(history+current kv len) = ",
+                seq_lens_for_extend,
+                flush=True,
+            )
+            print(
+                "[zejun] AiterFlashAttentionMetadataBuilder build, computed_kv_lens(history kv len) = ",
+                computed_kv_lens,
+                flush=True,
+            )
 
             # allocate the equal amount of workspace for
             # each chunk prefill request
             max_context_chunk = _CP_TOKENS_PER_ITER_ROCM // num_extends
             num_chunks = cdiv(computed_kv_lens.max().item(), max_context_chunk)
 
-            print('[zejun] AiterFlashAttentionMetadataBuilder build, num_extends = ', num_extends, flush=True)
-            print('[zejun] AiterFlashAttentionMetadataBuilder build, max_context_chunk = ', max_context_chunk, flush=True)
-            print('[zejun] AiterFlashAttentionMetadataBuilder build, num_chunks = ', num_chunks, flush=True)
+            print(
+                "[zejun] AiterFlashAttentionMetadataBuilder build, num_extends = ",
+                num_extends,
+                flush=True,
+            )
+            print(
+                "[zejun] AiterFlashAttentionMetadataBuilder build, max_context_chunk = ",
+                max_context_chunk,
+                flush=True,
+            )
+            print(
+                "[zejun] AiterFlashAttentionMetadataBuilder build, num_chunks = ",
+                num_chunks,
+                flush=True,
+            )
 
             chunk_starts = (
                 torch.arange(num_chunks, dtype=torch.int32)
@@ -516,7 +559,7 @@ class AiterFlashAttentionImpl(AttentionImpl):
             alibi_slopes = torch.tensor(alibi_slopes, dtype=torch.float32)
         self.alibi_slopes = alibi_slopes
 
-        # FIXME: As a WA, use rocm unified attention as PA when sliding window is required        
+        # FIXME: As a WA, use rocm unified attention as PA when sliding window is required
         self.fallback_to_rocm_unified_attn = False
         if sliding_window is None:
             self.sliding_window = [-1, -1]
@@ -524,9 +567,12 @@ class AiterFlashAttentionImpl(AttentionImpl):
             self.sliding_window = [sliding_window - 1, 0]
             self.fallback_to_rocm_unified_attn = True
             from aiter.ops.triton.unified_attention import unified_attention
+
             self.rocm_unified_attn_impl = unified_attention
-            logger.warning("Fallback to rocm unified attention for decode when \
-                sliding window is required in AITER FA backend")
+            logger.warning(
+                "Fallback to rocm unified attention for decode when \
+                sliding window is required in AITER FA backend"
+            )
 
         self.kv_cache_dtype = kv_cache_dtype
         if logits_soft_cap is None:
@@ -546,7 +592,13 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 "FlashAttentionImpl"
             )
 
-        print('[zejun] AiterFlashAttentionImpl __init__, self.sliding_window = ', self.sliding_window, '. self.fallback_to_rocm_unified_attn = ', self.fallback_to_rocm_unified_attn, flush=True)
+        print(
+            "[zejun] AiterFlashAttentionImpl __init__, self.sliding_window = ",
+            self.sliding_window,
+            ". self.fallback_to_rocm_unified_attn = ",
+            self.fallback_to_rocm_unified_attn,
+            flush=True,
+        )
 
     def extend_forward(
         self,
@@ -594,22 +646,74 @@ class AiterFlashAttentionImpl(AttentionImpl):
         key_fetched, value_fetched = workspace[0], workspace[1]
         chunked_output = None
         chunked_lse = None
-        print('[zejun] extend_forward, num_chunks = ', num_chunks, flush=True)
+        print("[zejun] extend_forward, num_chunks = ", num_chunks, flush=True)
         for chunk_idx in range(num_chunks):
-            print('[zejun] extend_forward, chunk_idx = ', chunk_idx, flush=True)
-            print('[zejun] extend_forward, key_cache shape = ', key_cache.shape, flush=True)
-            print('[zejun] extend_forward, value_cache shape = ', value_cache.shape, flush=True)
-            print('[zejun] extend_forward, key_fetched shape = ', key_fetched.shape, flush=True)
-            print('[zejun] extend_forward, value_fetched shape = ', value_fetched.shape, flush=True)
-            print('[zejun] extend_forward, block_table shape = ', block_table.shape, flush=True)
-            print('[zejun] extend_forward, cu_seqlens_kv shape = ', cu_seqlens_kv.shape, flush=True)
-            print('[zejun] extend_forward, cu_seqlens_kv[chunk_idx] = ', cu_seqlens_kv[chunk_idx], flush=True)
-            print('[zejun] extend_forward, token_to_batch shape = ', token_to_batch.shape, flush=True)
-            print('[zejun] extend_forward, token_to_batch[chunk_idx] = ', token_to_batch[chunk_idx], flush=True)
-            print('[zejun] extend_forward, chunk_starts shape = ', chunk_starts.shape, flush=True)
-            print('[zejun] extend_forward, chunk_starts[chunk_idx] = ', chunk_starts[chunk_idx], flush=True)
-            print('[zejun] extend_forward, total_token_per_batch shape = ', total_token_per_batch.shape, flush=True)
-            print('[zejun] extend_forward, total_token_per_batch[chunk_idx] = ', total_token_per_batch[chunk_idx], flush=True)
+            print("[zejun] extend_forward, chunk_idx = ", chunk_idx, flush=True)
+            print(
+                "[zejun] extend_forward, key_cache shape = ",
+                key_cache.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, value_cache shape = ",
+                value_cache.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, key_fetched shape = ",
+                key_fetched.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, value_fetched shape = ",
+                value_fetched.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, block_table shape = ",
+                block_table.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, cu_seqlens_kv shape = ",
+                cu_seqlens_kv.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, cu_seqlens_kv[chunk_idx] = ",
+                cu_seqlens_kv[chunk_idx],
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, token_to_batch shape = ",
+                token_to_batch.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, token_to_batch[chunk_idx] = ",
+                token_to_batch[chunk_idx],
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, chunk_starts shape = ",
+                chunk_starts.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, chunk_starts[chunk_idx] = ",
+                chunk_starts[chunk_idx],
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, total_token_per_batch = ",
+                total_token_per_batch,
+                flush=True,
+            )
+            print(
+                "[zejun] extend_forward, total_token_per_batch[chunk_idx] = ",
+                total_token_per_batch[chunk_idx],
+                flush=True,
+            )
             cp_mha_gather_cache(
                 key_cache=key_cache,
                 value_cache=value_cache,
@@ -667,61 +771,58 @@ class AiterFlashAttentionImpl(AttentionImpl):
             suffix_lse=lse,
         )
 
+    # class AiterFlashAttentionMetadata:
+    #     num_actual_tokens: int  # Number of tokens excluding padding.
+    #     num_actual_kv_tokens: int
+    #     max_query_len: int
+    #     query_start_loc: torch.Tensor
+    #     max_seq_len: int
+    #     seq_lens: torch.Tensor
+    #     slot_mapping: torch.Tensor
+    #     block_table: torch.Tensor
+    #     # prefill and deocde split
+    #     num_decodes: int
+    #     num_decode_tokens: int
+    #     num_prefills: int
+    #     num_prefill_tokens: int
+    #     num_extends: int
+    #     num_extend_tokens: int
 
+    #     decode_metadata: AiterFlashAttentionDecodeMetadata | None
+    #     prefill_metadata: AiterFlashAttentionPrefillMetadata | None
+    #     extend_metadata: AiterFlashAttentionChunkPrefillMetadata | None
 
-# class AiterFlashAttentionMetadata:
-#     num_actual_tokens: int  # Number of tokens excluding padding.
-#     num_actual_kv_tokens: int
-#     max_query_len: int
-#     query_start_loc: torch.Tensor
-#     max_seq_len: int
-#     seq_lens: torch.Tensor
-#     slot_mapping: torch.Tensor
-#     block_table: torch.Tensor
-#     # prefill and deocde split
-#     num_decodes: int
-#     num_decode_tokens: int
-#     num_prefills: int
-#     num_prefill_tokens: int
-#     num_extends: int
-#     num_extend_tokens: int
+    #     # For cascade attention.
+    #     use_cascade: bool
+    #     common_prefix_len: int
+    #     total_tokens: int
 
-#     decode_metadata: AiterFlashAttentionDecodeMetadata | None
-#     prefill_metadata: AiterFlashAttentionPrefillMetadata | None
-#     extend_metadata: AiterFlashAttentionChunkPrefillMetadata | None
+    # class FlashAttentionMetadata:
+    #     num_actual_tokens: int
+    #     max_query_len: int
+    #     query_start_loc: torch.Tensor
+    #     max_seq_len: int
+    #     seq_lens: torch.Tensor
+    #     block_table: torch.Tensor
+    #     slot_mapping: torch.Tensor
 
-#     # For cascade attention.
-#     use_cascade: bool
-#     common_prefix_len: int
-#     total_tokens: int
+    #     # For cascade attention.
+    #     use_cascade: bool
+    #     common_prefix_len: int
+    #     cu_prefix_query_lens: torch.Tensor | None
+    #     prefix_kv_lens: torch.Tensor | None
+    #     suffix_kv_lens: torch.Tensor | None
 
+    #     # For GQA DCP
+    #     max_dcp_context_kv_len: int | None = None
+    #     dcp_context_kv_lens: torch.Tensor | None = None
 
-# class FlashAttentionMetadata:
-#     num_actual_tokens: int
-#     max_query_len: int
-#     query_start_loc: torch.Tensor
-#     max_seq_len: int
-#     seq_lens: torch.Tensor
-#     block_table: torch.Tensor
-#     slot_mapping: torch.Tensor
+    #     # Optional aot scheduling
+    #     scheduler_metadata: torch.Tensor | None = None
+    #     prefix_scheduler_metadata: torch.Tensor | None = None
+    #     max_num_splits: int = 0
 
-#     # For cascade attention.
-#     use_cascade: bool
-#     common_prefix_len: int
-#     cu_prefix_query_lens: torch.Tensor | None
-#     prefix_kv_lens: torch.Tensor | None
-#     suffix_kv_lens: torch.Tensor | None
-
-#     # For GQA DCP
-#     max_dcp_context_kv_len: int | None = None
-#     dcp_context_kv_lens: torch.Tensor | None = None
-
-#     # Optional aot scheduling
-#     scheduler_metadata: torch.Tensor | None = None
-#     prefix_scheduler_metadata: torch.Tensor | None = None
-#     max_num_splits: int = 0
-
-#     causal: bool = True
+    #     causal: bool = True
 
     def forward(
         self,
@@ -807,15 +908,19 @@ class AiterFlashAttentionImpl(AttentionImpl):
         num_prefills = attn_metadata.num_prefills
         num_extends = attn_metadata.num_extends
 
-        print('[zejun] num_prefills = ', num_prefills, flush=True)
-        print('[zejun] num_extends = ', num_extends, flush=True)
-        print('[zejun] num_decodes = ', num_decodes, flush=True)
+        print("[zejun] num_prefills = ", num_prefills, flush=True)
+        print("[zejun] num_extends = ", num_extends, flush=True)
+        print("[zejun] num_decodes = ", num_decodes, flush=True)
 
         num_decode_tokens = attn_metadata.num_decode_tokens
         num_extend_tokens = attn_metadata.num_extend_tokens
-        print('[zejun] num_decode_tokens = ', num_decode_tokens, flush=True)
-        print('[zejun] num_extend_tokens = ', num_extend_tokens, flush=True)
-        print('[zejun] attn_metadata.use_cascade = ', attn_metadata.use_cascade, flush=True)
+        print("[zejun] num_decode_tokens = ", num_decode_tokens, flush=True)
+        print("[zejun] num_extend_tokens = ", num_extend_tokens, flush=True)
+        print(
+            "[zejun] attn_metadata.use_cascade = ",
+            attn_metadata.use_cascade,
+            flush=True,
+        )
 
         if not attn_metadata.use_cascade:
             # calculate for pure prefills
@@ -826,9 +931,21 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 prefill_key = key[num_decode_tokens + num_extend_tokens :]
                 prefill_value = value[num_decode_tokens + num_extend_tokens :]
 
-                print('[zejun] num_prefills > 0, prefill_query shape = ', prefill_query.shape, flush=True)
-                print('[zejun] num_prefills > 0, prefill_key shape = ', prefill_key.shape, flush=True)
-                print('[zejun] num_prefills > 0, prefill_value shape = ', prefill_value.shape, flush=True)
+                print(
+                    "[zejun] num_prefills > 0, prefill_query shape = ",
+                    prefill_query.shape,
+                    flush=True,
+                )
+                print(
+                    "[zejun] num_prefills > 0, prefill_key shape = ",
+                    prefill_key.shape,
+                    flush=True,
+                )
+                print(
+                    "[zejun] num_prefills > 0, prefill_value shape = ",
+                    prefill_value.shape,
+                    flush=True,
+                )
 
                 aiter.flash_attn_varlen_func(
                     q=prefill_query,
@@ -881,7 +998,6 @@ class AiterFlashAttentionImpl(AttentionImpl):
 
             # calculate for decodes
             if num_decodes > 0:
-
                 # fallback to rocm unified attention when sliding window is required
                 # if self.fallback_to_rocm_unified_attn:
                 if 0:
@@ -911,9 +1027,9 @@ class AiterFlashAttentionImpl(AttentionImpl):
                     # )
                 else:
                     assert attn_metadata.decode_metadata is not None
-                    print('[zejun] -----------------------------', flush=True)
-                    print('[zejun] num_decodes = ', num_decodes, flush=True)
-                    print('[zejun] num_decode_tokens = ', num_decode_tokens, flush=True)
+                    print("[zejun] -----------------------------", flush=True)
+                    print("[zejun] num_decodes = ", num_decodes, flush=True)
+                    print("[zejun] num_decode_tokens = ", num_decode_tokens, flush=True)
                     _, num_heads, head_size = query.shape
                     nbytes_per_qo_elem = torch.finfo(query.dtype).bits // 8
                     num_seqs = attn_metadata.seq_lens.shape[0]
@@ -921,12 +1037,20 @@ class AiterFlashAttentionImpl(AttentionImpl):
                         attn_metadata.max_seq_len + _PARTITION_SIZE_ROCM - 1
                     ) // _PARTITION_SIZE_ROCM
 
-                    print('[zejun] num_heads = ', num_heads, flush=True)
-                    print('[zejun] head_size = ', head_size, flush=True)
-                    print('[zejun] nbytes_per_qo_elem = ', nbytes_per_qo_elem, flush=True)
-                    print('[zejun] num_seqs = ', num_seqs, flush=True)
-                    print('[zejun] _PARTITION_SIZE_ROCM = ', _PARTITION_SIZE_ROCM, flush=True)
-                    print('[zejun] max_num_partitions = ', max_num_partitions, flush=True)
+                    print("[zejun] num_heads = ", num_heads, flush=True)
+                    print("[zejun] head_size = ", head_size, flush=True)
+                    print(
+                        "[zejun] nbytes_per_qo_elem = ", nbytes_per_qo_elem, flush=True
+                    )
+                    print("[zejun] num_seqs = ", num_seqs, flush=True)
+                    print(
+                        "[zejun] _PARTITION_SIZE_ROCM = ",
+                        _PARTITION_SIZE_ROCM,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] max_num_partitions = ", max_num_partitions, flush=True
+                    )
 
                     workspace_buffer = torch.empty(
                         (num_seqs * num_heads * max_num_partitions * head_size)
@@ -936,45 +1060,133 @@ class AiterFlashAttentionImpl(AttentionImpl):
                         device=output.device,
                     )
 
-                    print('[zejun] workspace_buffer.shape = ', workspace_buffer.shape, flush=True)
-                    print('[zejun] self.sliding_window = ', self.sliding_window, flush=True)
-                    print('[zejun] self.scale = ', self.scale, flush=True)
-                    print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
-                    print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
-                    print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
-                    print('[zejun] self.alibi_slopes = ', self.alibi_slopes, flush=True)
-                    print('[zejun] self.kv_cache_dtype = ', self.kv_cache_dtype, flush=True)
+                    print(
+                        "[zejun] workspace_buffer.shape = ",
+                        workspace_buffer.shape,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] self.sliding_window = ",
+                        self.sliding_window,
+                        flush=True,
+                    )
+                    print("[zejun] self.scale = ", self.scale, flush=True)
+                    print(
+                        "[zejun] attn_metadata.query_start_loc.shape = ",
+                        attn_metadata.query_start_loc.shape,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.seq_lens.shape = ",
+                        attn_metadata.seq_lens.shape,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.max_seq_len = ",
+                        attn_metadata.max_seq_len,
+                        flush=True,
+                    )
+                    print("[zejun] self.alibi_slopes = ", self.alibi_slopes, flush=True)
+                    print(
+                        "[zejun] self.kv_cache_dtype = ",
+                        self.kv_cache_dtype,
+                        flush=True,
+                    )
 
-                    print('[zejun] query.shape = ', query.shape, flush=True)
-                    print('[zejun] query[:num_decode_tokens].shape = ', query[:num_decode_tokens].shape, flush=True)
-                    print('[zejun] key_cache.shape = ', key_cache.shape, flush=True)
-                    print('[zejun] value_cache.shape = ', value_cache.shape, flush=True)
-                    print('[zejun] key_cache.data_ptr() = ', key_cache.data_ptr(), flush=True)
-                    print('[zejun] value_cache.data_ptr() = ', value_cache.data_ptr(), flush=True)
-                    print('[zejun] self.scale = ', self.scale, flush=True)
+                    print("[zejun] query.shape = ", query.shape, flush=True)
+                    print(
+                        "[zejun] query[:num_decode_tokens].shape = ",
+                        query[:num_decode_tokens].shape,
+                        flush=True,
+                    )
+                    print("[zejun] key_cache.shape = ", key_cache.shape, flush=True)
+                    print("[zejun] value_cache.shape = ", value_cache.shape, flush=True)
+                    print(
+                        "[zejun] key_cache.data_ptr() = ",
+                        key_cache.data_ptr(),
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] value_cache.data_ptr() = ",
+                        value_cache.data_ptr(),
+                        flush=True,
+                    )
+                    print("[zejun] self.scale = ", self.scale, flush=True)
 
-                    print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
+                    print(
+                        "[zejun] attn_metadata.block_table[0,:512] = \n",
+                        attn_metadata.block_table[0, :512],
+                        flush=True,
+                    )
                     # print('[zejun] attn_metadata.block_table[0,7743:] = \n', attn_metadata.block_table[0,7743:], flush=True)
                     ccnt_nonzero = torch.nonzero(attn_metadata.block_table)
-                    print('[zejun] block table non zero shape = ', ccnt_nonzero.shape, flush=True)
-                    print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
-                    print('[zejun] attn_metadata.block_table[:num_decodes].shape = ', attn_metadata.block_table[:num_decodes].shape, flush=True)
+                    print(
+                        "[zejun] block table non zero shape = ",
+                        ccnt_nonzero.shape,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.block_table.shape = ",
+                        attn_metadata.block_table.shape,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.block_table[:num_decodes].shape = ",
+                        attn_metadata.block_table[:num_decodes].shape,
+                        flush=True,
+                    )
 
-                    print('[zejun] attn_metadata.query_start_loc = ', attn_metadata.query_start_loc, flush=True)
-                    print('[zejun] attn_metadata.query_start_loc.shape = ', attn_metadata.query_start_loc.shape, flush=True)
-                    print('[zejun] attn_metadata.query_start_loc[:num_decodes].shape = ', attn_metadata.query_start_loc[:num_decodes].shape, flush=True)
+                    print(
+                        "[zejun] attn_metadata.query_start_loc = ",
+                        attn_metadata.query_start_loc,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.query_start_loc.shape = ",
+                        attn_metadata.query_start_loc.shape,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.query_start_loc[:num_decodes].shape = ",
+                        attn_metadata.query_start_loc[:num_decodes].shape,
+                        flush=True,
+                    )
 
-                    print('[zejun] attn_metadata.seq_lens = ', attn_metadata.seq_lens, flush=True)
-                    print('[zejun] attn_metadata.seq_lens.shape = ', attn_metadata.seq_lens.shape, flush=True)
-                    print('[zejun] attn_metadata.seq_lens[:num_decodes] = ', attn_metadata.seq_lens[:num_decodes], flush=True)
-                    print('[zejun] attn_metadata.seq_lens[:num_decodes].shape = ', attn_metadata.seq_lens[:num_decodes].shape, flush=True)
+                    print(
+                        "[zejun] attn_metadata.seq_lens = ",
+                        attn_metadata.seq_lens,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.seq_lens.shape = ",
+                        attn_metadata.seq_lens.shape,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.seq_lens[:num_decodes] = ",
+                        attn_metadata.seq_lens[:num_decodes],
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] attn_metadata.seq_lens[:num_decodes].shape = ",
+                        attn_metadata.seq_lens[:num_decodes].shape,
+                        flush=True,
+                    )
 
-                    print('[zejun] attn_metadata.max_seq_len = ', attn_metadata.max_seq_len, flush=True)
-                    print('[zejun] self.logits_soft_cap = ', self.logits_soft_cap, flush=True)
-                    print('[zejun] layer._k_scale = ', layer._k_scale, flush=True)
-                    print('[zejun] layer._v_scale = ', layer._v_scale, flush=True)
+                    print(
+                        "[zejun] attn_metadata.max_seq_len = ",
+                        attn_metadata.max_seq_len,
+                        flush=True,
+                    )
+                    print(
+                        "[zejun] self.logits_soft_cap = ",
+                        self.logits_soft_cap,
+                        flush=True,
+                    )
+                    print("[zejun] layer._k_scale = ", layer._k_scale, flush=True)
+                    print("[zejun] layer._v_scale = ", layer._v_scale, flush=True)
 
-                    print('[zejun] call paged_attention_v1', flush=True)
+                    print("[zejun] call paged_attention_v1", flush=True)
                     torch.ops.aiter.paged_attention_v1(
                         output[:num_decode_tokens],
                         workspace_buffer,

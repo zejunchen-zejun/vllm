@@ -1361,6 +1361,8 @@ class GPUModelRunner(
         for kv_cache_gid, kv_cache_group in enumerate(
             self.kv_cache_config.kv_cache_groups
         ):
+            print('[zejun] _build_attention_metadata, kv_cache_gid = ', kv_cache_gid, flush=True)
+            print('[zejun] _build_attention_metadata, kv_cache_group = ', kv_cache_group, flush=True)
             encoder_seq_lens = self._get_encoder_seq_lens(
                 scheduled_encoder_inputs or {},
                 kv_cache_group.kv_cache_spec,
