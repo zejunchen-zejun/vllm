@@ -527,6 +527,8 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 "FlashAttentionImpl"
             )
 
+        print('[zejun] AiterFlashAttentionImpl __init__, self.sliding_window = ', self.sliding_window, flush=True)
+
     def extend_forward(
         self,
         attn_metadata: AiterFlashAttentionMetadata,
@@ -630,6 +632,62 @@ class AiterFlashAttentionImpl(AttentionImpl):
             suffix_output=out,
             suffix_lse=lse,
         )
+
+
+
+# class AiterFlashAttentionMetadata:
+#     num_actual_tokens: int  # Number of tokens excluding padding.
+#     num_actual_kv_tokens: int
+#     max_query_len: int
+#     query_start_loc: torch.Tensor
+#     max_seq_len: int
+#     seq_lens: torch.Tensor
+#     slot_mapping: torch.Tensor
+#     block_table: torch.Tensor
+#     # prefill and deocde split
+#     num_decodes: int
+#     num_decode_tokens: int
+#     num_prefills: int
+#     num_prefill_tokens: int
+#     num_extends: int
+#     num_extend_tokens: int
+
+#     decode_metadata: AiterFlashAttentionDecodeMetadata | None
+#     prefill_metadata: AiterFlashAttentionPrefillMetadata | None
+#     extend_metadata: AiterFlashAttentionChunkPrefillMetadata | None
+
+#     # For cascade attention.
+#     use_cascade: bool
+#     common_prefix_len: int
+#     total_tokens: int
+
+
+# class FlashAttentionMetadata:
+#     num_actual_tokens: int
+#     max_query_len: int
+#     query_start_loc: torch.Tensor
+#     max_seq_len: int
+#     seq_lens: torch.Tensor
+#     block_table: torch.Tensor
+#     slot_mapping: torch.Tensor
+
+#     # For cascade attention.
+#     use_cascade: bool
+#     common_prefix_len: int
+#     cu_prefix_query_lens: torch.Tensor | None
+#     prefix_kv_lens: torch.Tensor | None
+#     suffix_kv_lens: torch.Tensor | None
+
+#     # For GQA DCP
+#     max_dcp_context_kv_len: int | None = None
+#     dcp_context_kv_lens: torch.Tensor | None = None
+
+#     # Optional aot scheduling
+#     scheduler_metadata: torch.Tensor | None = None
+#     prefix_scheduler_metadata: torch.Tensor | None = None
+#     max_num_splits: int = 0
+
+#     causal: bool = True
 
     def forward(
         self,
@@ -821,8 +879,8 @@ class AiterFlashAttentionImpl(AttentionImpl):
                 print('[zejun] value_cache.data_ptr() = ', value_cache.data_ptr(), flush=True)
                 print('[zejun] self.scale = ', self.scale, flush=True)
 
-                print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
-                print('[zejun] attn_metadata.block_table[0,7743:] = \n', attn_metadata.block_table[0,7743:], flush=True)
+                # print('[zejun] attn_metadata.block_table[0,:512] = \n', attn_metadata.block_table[0,:512], flush=True)
+                # print('[zejun] attn_metadata.block_table[0,7743:] = \n', attn_metadata.block_table[0,7743:], flush=True)
                 print('[zejun] attn_metadata.block_table.shape = ', attn_metadata.block_table.shape, flush=True)
                 print('[zejun] attn_metadata.block_table[:num_decodes].shape = ', attn_metadata.block_table[:num_decodes].shape, flush=True)
 

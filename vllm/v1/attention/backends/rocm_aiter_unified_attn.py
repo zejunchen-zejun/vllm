@@ -117,6 +117,14 @@ class RocmAiterUnifiedAttentionImpl(RocmAttentionImpl):
         """
         assert output is not None, "Output tensor must be provided."
 
+        print('[zejun] --------------------------------------------------------------')
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, layer = ', layer, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, query.shape = ', query.shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, key.shape = ', key.shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, value.shape = ', value.shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, kv_cache.shape = ', kv_cache.shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, output.shape = ', output.shape, flush=True)
+
         if output_block_scale is not None:
             raise NotImplementedError(
                 "fused block_scale output quantization is not yet supported"
@@ -141,6 +149,11 @@ class RocmAiterUnifiedAttentionImpl(RocmAttentionImpl):
         num_actual_tokens = attn_metadata.num_actual_tokens
 
         key_cache, value_cache = kv_cache.unbind(0)
+
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, num_actual_tokens = ', num_actual_tokens, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, key_cache.shape = ', key_cache.shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, value_cache.shape = ', value_cache.shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, slot_mapping = ', attn_metadata.slot_mapping, flush=True)
 
         if self.kv_sharing_target_layer_name is None:
             # Reshape the input keys and values and store them in the cache.
@@ -171,6 +184,21 @@ class RocmAiterUnifiedAttentionImpl(RocmAttentionImpl):
 
         descale_shape = (cu_seqlens_q.shape[0] - 1, key.shape[1])
 
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, query[:num_actual_tokens].shape = ', query[:num_actual_tokens].shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, query = ', query, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, cu_seqlens_q = ', cu_seqlens_q, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, seqused_k = ', seqused_k, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, max_seqlen_q = ', max_seqlen_q, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, max_seqlen_k = ', max_seqlen_k, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, block_table[0,:512] = \n', block_table[0,:512], flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, block_table[0,7743:] = \n', block_table[0,7743:], flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, block_table.shape = ', block_table.shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, descale_shape = ', descale_shape, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, self.scale = ', self.scale, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, self.sliding_window = ', self.sliding_window, flush=True)
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, self.sinks = ', self.sinks, flush=True)
+
+        print('[zejun] RocmAiterUnifiedAttentionImpl forward, call unified_attention', flush=True)
         self.unified_attention(
             q=query[:num_actual_tokens],
             k=key_cache,
