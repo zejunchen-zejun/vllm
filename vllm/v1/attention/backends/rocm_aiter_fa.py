@@ -1131,6 +1131,11 @@ class AiterFlashAttentionImpl(AttentionImpl):
                         flush=True,
                     )
                     print(
+                        "[zejun] attn_metadata.block_table.data_ptr() = ",
+                        attn_metadata.block_table.data_ptr(),
+                        flush=True,
+                    )
+                    print(
                         "[zejun] attn_metadata.block_table[:num_decodes].shape = ",
                         attn_metadata.block_table[:num_decodes].shape,
                         flush=True,
