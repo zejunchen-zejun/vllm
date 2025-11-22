@@ -32,6 +32,7 @@ _CP_TOKENS_PER_ITER_ROCM = 32 * 1024
 
 if current_platform.is_rocm():
     import aiter
+    from aiter.ops.triton.gluon.pa_decode_gluon import paged_attention_decode
 
     from vllm.triton_utils import tl, triton
 
@@ -772,42 +773,71 @@ class AiterFlashAttentionImpl(AttentionImpl):
 
             # calculate for decodes
             if num_decodes > 0:
-                assert attn_metadata.decode_metadata is not None
-                _, num_heads, head_size = query.shape
-                nbytes_per_qo_elem = torch.finfo(query.dtype).bits // 8
-                num_seqs = attn_metadata.seq_lens.shape[0]
-                max_num_partitions = (
-                    attn_metadata.max_seq_len + _PARTITION_SIZE_ROCM - 1
-                ) // _PARTITION_SIZE_ROCM
-
-                workspace_buffer = torch.empty(
-                    (num_seqs * num_heads * max_num_partitions * head_size)
-                    * nbytes_per_qo_elem
-                    + 2 * (num_seqs * num_heads * max_num_partitions) * 4,
-                    dtype=torch.uint8,
-                    device=output.device,
+                # TODO: register this op to torch.ops
+                paged_attention_decode(
+                    output=output[
+                        :num_decode_tokens
+                    ],  # [num_seqs, num_kv_heads*query_grp_sz, head_sz]
+                    query=query[
+                        :num_decode_tokens
+                    ],  # [num_seqs, num_kv_heads*query_grp_sz, head_sz]
+                    key_cache=key_cache.transpose(
+                        1, 2
+                    ),  # [num_blks, num_kv_heads, kv_blk_sz, head_sz]
+                    value_cache=value_cache.transpose(
+                        1, 2
+                    ),  # [num_blks, num_kv_heads, kv_blk_sz, head_sz]
+                    seq_lens=attn_metadata.seq_lens[:num_decodes],  # [num_seqs]
+                    block_tables=attn_metadata.block_table[
+                        :num_decodes
+                    ],  # [num_seqs, max_num_blks_per_seq]
+                    attn_scale=self.scale,
+                    max_seq_len=attn_metadata.max_seq_len,
+                    compute_type=query.dtype,
+                    k_scale=layer._k_scale,
+                    v_scale=layer._v_scale,
+                    num_seq_partitions=0,
+                    alibi_slopes=self.alibi_slopes,
+                    sinks=None,
+                    sliding_window=self.sliding_window[0],
                 )
 
-                torch.ops.aiter.paged_attention_v1(
-                    output[:num_decode_tokens],
-                    workspace_buffer,
-                    query[:num_decode_tokens],
-                    key_cache,
-                    value_cache,
-                    self.scale,
-                    attn_metadata.block_table[:num_decodes],
-                    attn_metadata.query_start_loc[:num_decodes],
-                    attn_metadata.seq_lens[:num_decodes],
-                    attn_metadata.max_seq_len,
-                    self.alibi_slopes,
-                    self.kv_cache_dtype,
-                    "NHD",
-                    self.logits_soft_cap,
-                    layer._k_scale,
-                    layer._v_scale,
-                    None,
-                    _PARTITION_SIZE_ROCM,
-                )
+                # assert attn_metadata.decode_metadata is not None
+                # _, num_heads, head_size = query.shape
+                # nbytes_per_qo_elem = torch.finfo(query.dtype).bits // 8
+                # num_seqs = attn_metadata.seq_lens.shape[0]
+                # max_num_partitions = (
+                #     attn_metadata.max_seq_len + _PARTITION_SIZE_ROCM - 1
+                # ) // _PARTITION_SIZE_ROCM
+
+                # workspace_buffer = torch.empty(
+                #     (num_seqs * num_heads * max_num_partitions * head_size)
+                #     * nbytes_per_qo_elem
+                #     + 2 * (num_seqs * num_heads * max_num_partitions) * 4,
+                #     dtype=torch.uint8,
+                #     device=output.device,
+                # )
+
+                # torch.ops.aiter.paged_attention_v1(
+                #     output[:num_decode_tokens],
+                #     workspace_buffer,
+                #     query[:num_decode_tokens],
+                #     key_cache,
+                #     value_cache,
+                #     self.scale,
+                #     attn_metadata.block_table[:num_decodes],
+                #     attn_metadata.query_start_loc[:num_decodes],
+                #     attn_metadata.seq_lens[:num_decodes],
+                #     attn_metadata.max_seq_len,
+                #     self.alibi_slopes,
+                #     self.kv_cache_dtype,
+                #     "NHD",
+                #     self.logits_soft_cap,
+                #     layer._k_scale,
+                #     layer._v_scale,
+                #     None,
+                #     _PARTITION_SIZE_ROCM,
+                # )
         else:
             raise NotImplementedError(
                 "Cascade attention is not implemented for ROCM AITER"
