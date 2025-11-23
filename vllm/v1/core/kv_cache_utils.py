@@ -9,6 +9,8 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, NewType, TypeAlias
 
+from regex import P
+
 from vllm import envs
 from vllm.config import VllmConfig
 from vllm.logger import init_logger
@@ -1026,16 +1028,22 @@ def get_kv_cache_config_from_groups(
         )
 
     # Determine how model runners should initialize the KV cache tensors.
+    print('[zejun] get_kv_cache_config_from_groups, len(kv_cache_groups) = ', len(kv_cache_groups), flush=True)
+    print('[zejun] get_kv_cache_config_from_groups, available_memory(GB) = ', available_memory / 1024.0 / 1024.0 / 1024.0, flush=True)
+    print('[zejun] get_kv_cache_config_from_groups, kv_cache_groups[0].kv_cache_spec.page_size_bytes = ', kv_cache_groups[0].kv_cache_spec.page_size_bytes, flush=True)
+
     if len(kv_cache_groups) == 1 and isinstance(
         kv_cache_groups[0].kv_cache_spec, UniformTypeKVCacheSpecs
     ):
         # Special case: all layers have the same type of KV cache but with
         # different hidden size. Allocate different amount of memory for each
         # layer based on its hidden size.
+        print('[zejun] get_kv_cache_config_from_groups, only 1 group', flush=True)
         num_blocks = (
             available_memory // kv_cache_groups[0].kv_cache_spec.page_size_bytes
         )
         num_blocks = may_override_num_blocks(vllm_config, num_blocks)
+        print('[zejun] get_kv_cache_config_from_groups, num_blocks = ', num_blocks, flush=True)
         per_layer_specs = kv_cache_groups[0].kv_cache_spec.kv_cache_specs
         kv_cache_tensors = [
             KVCacheTensor(
@@ -1060,6 +1068,7 @@ def get_kv_cache_config_from_groups(
         num_blocks = get_num_blocks(
             vllm_config, group_size, available_memory, page_size
         )
+        print('[zejun] get_kv_cache_config_from_groups, num_blocks = ', num_blocks, flush=True)
         kv_cache_tensors = []
         for i in range(group_size):
             shared_by = []

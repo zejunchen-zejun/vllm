@@ -1361,8 +1361,16 @@ class GPUModelRunner(
         for kv_cache_gid, kv_cache_group in enumerate(
             self.kv_cache_config.kv_cache_groups
         ):
-            print('[zejun] _build_attention_metadata, kv_cache_gid = ', kv_cache_gid, flush=True)
-            print('[zejun] _build_attention_metadata, kv_cache_group = ', kv_cache_group, flush=True)
+            print(
+                "[zejun] _build_attention_metadata, kv_cache_gid = ",
+                kv_cache_gid,
+                flush=True,
+            )
+            print(
+                "[zejun] _build_attention_metadata, kv_cache_group = ",
+                kv_cache_group,
+                flush=True,
+            )
             encoder_seq_lens = self._get_encoder_seq_lens(
                 scheduled_encoder_inputs or {},
                 kv_cache_group.kv_cache_spec,
@@ -1434,7 +1442,11 @@ class GPUModelRunner(
                         ],
                     )
 
-                print('[zejun] build_attention_metadata, ubatch_slices is not None = ', ubatch_slices is not None, flush=True)
+                print(
+                    "[zejun] build_attention_metadata, ubatch_slices is not None = ",
+                    ubatch_slices is not None,
+                    flush=True,
+                )
                 if ubatch_slices is not None:
                     common_attn_metadata_list = split_attn_metadata(
                         ubatch_slices, common_attn_metadata
@@ -2579,12 +2591,29 @@ class GPUModelRunner(
                 total_num_scheduled_tokens = scheduler_output.total_num_scheduled_tokens
                 use_spec_decode = len(scheduler_output.scheduled_spec_decode_tokens) > 0
 
-                print('[zejun] execute_model, try to build attention metadata = ', flush=True)
-                print('[zejun] execute_model, total_num_scheduled_tokens = ', total_num_scheduled_tokens, flush=True)
-                print('[zejun] execute_model, max_num_scheduled_tokens = ', max_num_scheduled_tokens, flush=True)
-                print('[zejun] execute_model, num_reqs = ', num_reqs, flush=True)
-                print('[zejun] execute_model, ubatch_slices = ', ubatch_slices, flush=True)
-                print('[zejun] execute_model, logits_indices shape = ', logits_indices.shape, flush=True)
+                print(
+                    "[zejun] execute_model, try to build attention metadata = ",
+                    flush=True,
+                )
+                print(
+                    "[zejun] execute_model, total_num_scheduled_tokens = ",
+                    total_num_scheduled_tokens,
+                    flush=True,
+                )
+                print(
+                    "[zejun] execute_model, max_num_scheduled_tokens = ",
+                    max_num_scheduled_tokens,
+                    flush=True,
+                )
+                print("[zejun] execute_model, num_reqs = ", num_reqs, flush=True)
+                print(
+                    "[zejun] execute_model, ubatch_slices = ", ubatch_slices, flush=True
+                )
+                print(
+                    "[zejun] execute_model, logits_indices shape = ",
+                    logits_indices.shape,
+                    flush=True,
+                )
                 attn_metadata, spec_decode_common_attn_metadata = (
                     self._build_attention_metadata(
                         total_num_scheduled_tokens=total_num_scheduled_tokens,
@@ -4502,7 +4531,13 @@ class GPUModelRunner(
         kv_cache_raw_tensors: dict[str, torch.Tensor] = {}
         ccnt = 0
         for kv_cache_tensor in kv_cache_config.kv_cache_tensors:
-            print('[zejun][ccnt:', ccnt,'] _allocate_kv_cache_tensors, kv_cache_tensor: ', kv_cache_tensor, flush=True)
+            print(
+                "[zejun][ccnt:",
+                ccnt,
+                "] _allocate_kv_cache_tensors, kv_cache_tensor: ",
+                kv_cache_tensor,
+                flush=True,
+            )
             ccnt += 1
             tensor = torch.zeros(
                 kv_cache_tensor.size, dtype=torch.int8, device=self.device
@@ -4511,9 +4546,21 @@ class GPUModelRunner(
                 kv_cache_raw_tensors[layer_name] = tensor
 
         for name, tensor in kv_cache_raw_tensors.items():
-            print('[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors name: ', name, flush=True)
-            print('[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors shape: ', tensor.shape, flush=True)
-            print('[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors data_ptr: ', tensor.data_ptr(), flush=True)
+            print(
+                "[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors name: ",
+                name,
+                flush=True,
+            )
+            print(
+                "[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors shape: ",
+                tensor.shape,
+                flush=True,
+            )
+            print(
+                "[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors data_ptr: ",
+                tensor.data_ptr(),
+                flush=True,
+            )
 
         layer_names = set()
         for group in kv_cache_config.kv_cache_groups:
@@ -4801,8 +4848,16 @@ class GPUModelRunner(
         kv_caches = self.initialize_kv_cache_tensors(
             kv_cache_config, kernel_block_sizes
         )
-        print('[zejun] after initialize_kv_cache_tensors, kv_caches shape: ', kv_caches.shape, flush=True)
-        print('[zejun] after initialize_kv_cache_tensors, kv_caches data_ptr: ', kv_caches.data_ptr(), flush=True)
+        # print(
+        #     "[zejun] after initialize_kv_cache_tensors, kv_caches shape: ",
+        #     kv_caches.shape,
+        #     flush=True,
+        # )
+        # print(
+        #     "[zejun] after initialize_kv_cache_tensors, kv_caches data_ptr: ",
+        #     kv_caches.data_ptr(),
+        #     flush=True,
+        # )
 
         if self.speculative_config and self.speculative_config.use_eagle():
             assert isinstance(self.drafter, EagleProposer)
@@ -4810,7 +4865,11 @@ class GPUModelRunner(
             # group
             self.drafter.validate_same_kv_cache_group(kv_cache_config)
 
-        print('[zejun] after initialize_kv_cache_tensors, has_kv_transfer_group(): ', has_kv_transfer_group(), flush=True)
+        print(
+            "[zejun] after initialize_kv_cache_tensors, has_kv_transfer_group(): ",
+            has_kv_transfer_group(),
+            flush=True,
+        )
         if has_kv_transfer_group():
             kv_transfer_group = get_kv_transfer_group()
             kv_transfer_group.register_kv_caches(kv_caches)

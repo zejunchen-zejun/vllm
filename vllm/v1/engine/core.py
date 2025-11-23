@@ -110,9 +110,21 @@ class EngineCore:
         num_gpu_blocks, num_cpu_blocks, kv_cache_config = self._initialize_kv_caches(
             vllm_config
         )
-        print('[zej] after _initialize_kv_caches, num_gpu_blocks: ', num_gpu_blocks, flush=True)
-        print('[zej] after _initialize_kv_caches, num_cpu_blocks: ', num_cpu_blocks, flush=True)
-        print('[zej] after _initialize_kv_caches, kv_cache_config: ', kv_cache_config, flush=True)
+        print(
+            "[zej] after _initialize_kv_caches, num_gpu_blocks: ",
+            num_gpu_blocks,
+            flush=True,
+        )
+        print(
+            "[zej] after _initialize_kv_caches, num_cpu_blocks: ",
+            num_cpu_blocks,
+            flush=True,
+        )
+        print(
+            "[zej] after _initialize_kv_caches, kv_cache_config: ",
+            kv_cache_config,
+            flush=True,
+        )
 
         vllm_config.cache_config.num_gpu_blocks = num_gpu_blocks
         vllm_config.cache_config.num_cpu_blocks = num_cpu_blocks
@@ -229,7 +241,11 @@ class EngineCore:
                 # Profiles the peak memory usage of the model to determine how
                 # much memory can be allocated for kv cache.
                 available_gpu_memory = self.model_executor.determine_available_memory()
-                print('[zejun] after determine_available_memory, available_gpu_memory(GB): ', available_gpu_memory / 1024.0 / 1024.0 / 1024.0, flush=True)
+                print(
+                    "[zejun] after determine_available_memory, available_gpu_memory:",
+                    available_gpu_memory,
+                    flush=True,
+                )
                 self.available_gpu_memory_for_kv_cache = available_gpu_memory[0]
         else:
             # Attention free models don't need memory for kv cache
