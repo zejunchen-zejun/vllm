@@ -4500,12 +4500,20 @@ class GPUModelRunner(
             corresponding memory buffer for KV cache.
         """
         kv_cache_raw_tensors: dict[str, torch.Tensor] = {}
+        ccnt = 0
         for kv_cache_tensor in kv_cache_config.kv_cache_tensors:
+            print('[zejun][ccnt:', ccnt,'] _allocate_kv_cache_tensors, kv_cache_tensor: ', kv_cache_tensor, flush=True)
+            ccnt += 1
             tensor = torch.zeros(
                 kv_cache_tensor.size, dtype=torch.int8, device=self.device
             )
             for layer_name in kv_cache_tensor.shared_by:
                 kv_cache_raw_tensors[layer_name] = tensor
+
+        for name, tensor in kv_cache_raw_tensors.items():
+            print('[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors name: ', name, flush=True)
+            print('[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors shape: ', tensor.shape, flush=True)
+            print('[zejun] _allocate_kv_cache_tensors, kv_cache_raw_tensors data_ptr: ', tensor.data_ptr(), flush=True)
 
         layer_names = set()
         for group in kv_cache_config.kv_cache_groups:
@@ -4793,6 +4801,8 @@ class GPUModelRunner(
         kv_caches = self.initialize_kv_cache_tensors(
             kv_cache_config, kernel_block_sizes
         )
+        print('[zejun] after initialize_kv_cache_tensors, kv_caches shape: ', kv_caches.shape, flush=True)
+        print('[zejun] after initialize_kv_cache_tensors, kv_caches data_ptr: ', kv_caches.data_ptr(), flush=True)
 
         if self.speculative_config and self.speculative_config.use_eagle():
             assert isinstance(self.drafter, EagleProposer)
@@ -4800,6 +4810,7 @@ class GPUModelRunner(
             # group
             self.drafter.validate_same_kv_cache_group(kv_cache_config)
 
+        print('[zejun] after initialize_kv_cache_tensors, has_kv_transfer_group(): ', has_kv_transfer_group(), flush=True)
         if has_kv_transfer_group():
             kv_transfer_group = get_kv_transfer_group()
             kv_transfer_group.register_kv_caches(kv_caches)
